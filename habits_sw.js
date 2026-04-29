@@ -1,5 +1,5 @@
 const CACHE = 'habits-v1';
-const ASSETS = ['./habits.html', './habits_manifest.json'];
+const ASSETS = ['./index.html', './habits_manifest.json'];
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS)));
@@ -21,5 +21,5 @@ self.addEventListener('fetch', e => {
 
 self.addEventListener('notificationclick', e => {
   e.notification.close();
-  e.waitUntil(clients.openWindow('./habits.html'));
+  e.waitUntil(clients.openWindow('./index.html'));
 });
