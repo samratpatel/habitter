@@ -6,7 +6,7 @@
 <meta name="theme-color" content="#0a0a0f">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<title>Habitter</title>
+<title>Habits</title>
 <link rel="manifest" href="habits_manifest.json">
 <script>
   if ("serviceWorker" in navigator) {
@@ -645,7 +645,7 @@ function renderManage() {
       <div class="manage-icon">${h.emoji}</div>
       <div class="manage-info">
         <div class="manage-name">${esc(h.name)}</div>
-        <div class="manage-detail">${h.type==='boolean'?'Daily yes/no':`Target: ${h.target} ${esc(h.unit)}`}${h.notifEnabled?` · ⏰ ${h.notifTime}':''}</div>
+        <div class="manage-detail">${h.type==='boolean'?'Daily yes/no':'Target: '+h.target+' '+esc(h.unit)}${h.notifEnabled?' · ⏰ '+h.notifTime:''}</div>
       </div>
       <button class="icon-btn" onclick="openEditModal('${h.id}')">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
