@@ -92,6 +92,46 @@ body::before {
   align-items: center;
   gap: 5px;
 }
+.date-nav {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 10px;
+}
+.date-nav-btn {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text2);
+  font-size: 18px;
+  width: 32px; height: 32px;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer;
+  transition: all 0.15s;
+  flex-shrink: 0;
+}
+.date-nav-btn:active { border-color: var(--accent); color: var(--accent); }
+.date-nav-btn:disabled { opacity: 0.3; pointer-events: none; }
+.header-date {
+  font-family: 'Azeret Mono', monospace;
+  font-size: 11px;
+  color: var(--text2);
+  letter-spacing: 0.06em;
+  flex: 1;
+  text-align: center;
+}
+.past-day-banner {
+  background: rgba(255,140,66,0.1);
+  border: 1px solid rgba(255,140,66,0.3);
+  border-radius: 10px;
+  padding: 8px 14px;
+  font-family: 'Azeret Mono', monospace;
+  font-size: 11px;
+  color: var(--orange);
+  text-align: center;
+  margin-bottom: 12px;
+  letter-spacing: 0.04em;
+}
 
 /* SCROLL */
 .scroll-area {
@@ -359,9 +399,13 @@ select option { background: #12121a; }
     <div class="header-top">
       <div>
         <h1>HABIT<em>S</em></h1>
-        <div class="header-date" id="header-date"></div>
       </div>
       <div class="streak-badge" id="best-streak-badge">🔥 0 day streak</div>
+    </div>
+    <div class="date-nav">
+      <button class="date-nav-btn" onclick="shiftDay(-1)">‹</button>
+      <div class="header-date" id="header-date"></div>
+      <button class="date-nav-btn" id="nav-forward" onclick="shiftDay(1)">›</button>
     </div>
   </div>
 
@@ -394,6 +438,18 @@ select option { background: #12121a; }
         <div id="manage-list"></div>
       </div>
       <div style="margin-top:16px;" id="notif-status-card"></div>
+
+      <div style="margin-top:16px;">
+        <div class="section-label">Data</div>
+        <div class="card">
+          <p style="font-size:13px;color:var(--text2);margin-bottom:14px;">Export all habits and logs as CSV. Import to restore from a backup — existing data is merged, not replaced.</p>
+          <div style="display:flex;flex-direction:column;gap:10px;">
+            <button class="btn-primary" onclick="exportCSV()">⬇ Export CSV</button>
+            <button class="btn-secondary" onclick="document.getElementById('csv-import-input').click()">⬆ Import CSV</button>
+            <input type="file" id="csv-import-input" accept=".csv,text/csv" style="display:none" onchange="importCSV(event)">
+          </div>
+        </div>
+      </div>
     </div>
 
   </div>
@@ -441,10 +497,15 @@ let editingHabitId = null;
 let selectedProgHabit = null;
 let chartInst = null;
 let modalEmoji = '🎯', modalType = 'boolean';
+let viewingDate = today(); // date string being viewed on Today tab
 
 function uid() { return crypto.randomUUID(); }
 function today() { return new Date().toISOString().split('T')[0]; }
 function fromDateStr(s) { const [y,m,d]=s.split('-').map(Number); return new Date(y,m-1,d); }
+function shiftDateStr(s, days) {
+  const d = fromDateStr(s); d.setDate(d.getDate()+days);
+  return d.toISOString().split('T')[0];
+}
 
 // ── STORAGE ──
 function getData() {
@@ -456,12 +517,30 @@ function saveData(d) { localStorage.setItem('habits_v1', JSON.stringify(d)); }
 
 // ── INIT ──
 document.addEventListener('DOMContentLoaded', () => {
-  const now = new Date();
-  document.getElementById('header-date').textContent = now.toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'}).toUpperCase();
+  updateDateHeader();
   renderToday();
   updateBestStreakBadge();
   scheduleAllNotifications();
 });
+
+// ── DATE NAVIGATION ──
+function updateDateHeader() {
+  const isToday = viewingDate === today();
+  const d = fromDateStr(viewingDate);
+  const label = isToday
+    ? 'TODAY — ' + d.toLocaleDateString('en-US',{month:'short',day:'numeric'}).toUpperCase()
+    : d.toLocaleDateString('en-US',{weekday:'long',month:'short',day:'numeric'}).toUpperCase();
+  document.getElementById('header-date').textContent = label;
+  document.getElementById('nav-forward').disabled = isToday;
+}
+
+function shiftDay(delta) {
+  const next = shiftDateStr(viewingDate, delta);
+  if (next > today()) return; // can't go to future
+  viewingDate = next;
+  updateDateHeader();
+  renderToday();
+}
 
 // ── TABS ──
 function switchTab(tab) {
@@ -469,16 +548,17 @@ function switchTab(tab) {
     document.getElementById(`page-${t}`).classList.toggle('active', t===tab);
     document.getElementById(`tab-${t}`).classList.toggle('active', t===tab);
   });
-  if (tab==='today') renderToday();
+  if (tab==='today') { viewingDate = today(); updateDateHeader(); renderToday(); }
   if (tab==='manage') renderManage();
   if (tab==='progress') renderProgressTab();
 }
 
 // ── TODAY ──
 function renderToday() {
-  const data = getData(), td = today();
+  const data = getData(), td = viewingDate;
   const list = document.getElementById('today-list');
   const empty = document.getElementById('today-empty');
+  const isToday = td === today();
 
   if (!data.habits.length) { list.innerHTML=''; empty.style.display='block'; renderDayProgress(0,0); return; }
   empty.style.display='none';
@@ -486,7 +566,12 @@ function renderToday() {
   const done = data.habits.filter(h => isDone(data, h, td)).length;
   renderDayProgress(done, data.habits.length);
 
-  list.innerHTML = data.habits.map(h => {
+  // Past day banner
+  const bannerHtml = !isToday
+    ? `<div class="past-day-banner">📅 Logging for a past day — changes will be saved</div>`
+    : '';
+
+  list.innerHTML = bannerHtml + data.habits.map(h => {
     const logVal = getLog(data, h.id, td);
     const isDoneToday = isDone(data, h, td);
     const streak = getStreak(data, h);
@@ -579,7 +664,7 @@ function setLog(habitId, date, val) {
 }
 
 function toggleBoolean(habitId) {
-  const data = getData(), td = today();
+  const data = getData(), td = viewingDate;
   const cur = getLog(data, habitId, td);
   const newVal = cur === true ? false : true;
   setLog(habitId, td, newVal);
@@ -588,7 +673,7 @@ function toggleBoolean(habitId) {
 }
 
 function adjustQty(habitId, delta) {
-  const data = getData(), td = today();
+  const data = getData(), td = viewingDate;
   const cur = getLog(data, habitId, td) || 0;
   const next = Math.max(0, cur + delta);
   setLog(habitId, td, next);
@@ -599,7 +684,7 @@ function adjustQty(habitId, delta) {
 }
 
 function markQuantity(habitId) {
-  const data = getData(), td = today();
+  const data = getData(), td = viewingDate;
   const habit = data.habits.find(h=>h.id===habitId);
   if (!habit) return;
   const cur = getLog(data, habitId, td) || 0;
@@ -923,6 +1008,98 @@ function scheduleNotification(habit) {
     }
     scheduleNotification(habit); // reschedule for next day
   }, ms);
+}
+
+// ── CSV EXPORT / IMPORT ──
+function csvEsc(s) {
+  s = String(s ?? '');
+  if (s.includes(',') || s.includes('"') || s.includes('\n')) return `"${s.replace(/"/g,'""')}"`;
+  return s;
+}
+
+function exportCSV() {
+  const data = getData();
+  // Sheet 1: habits definition
+  let csv = 'HABITS\n';
+  csv += 'id,name,emoji,type,unit,target,notifEnabled,notifTime,createdAt\n';
+  data.habits.forEach(h => {
+    csv += [csvEsc(h.id),csvEsc(h.name),csvEsc(h.emoji),csvEsc(h.type),csvEsc(h.unit),h.target,h.notifEnabled,csvEsc(h.notifTime),csvEsc(h.createdAt)].join(',')+'\n';
+  });
+  csv += '\nLOGS\n';
+  csv += 'habitId,habitName,date,value\n';
+  data.habits.forEach(h => {
+    const logs = data.logs[h.id] || {};
+    Object.entries(logs).sort((a,b)=>a[0].localeCompare(b[0])).forEach(([date, val]) => {
+      csv += [csvEsc(h.id),csvEsc(h.name),csvEsc(date),csvEsc(String(val))].join(',')+'\n';
+    });
+  });
+  const blob = new Blob([csv], {type:'text/csv;charset=utf-8;'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a'); a.href=url; a.download='habits_export.csv'; a.style.display='none';
+  document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
+  showToast('CSV exported');
+}
+
+function importCSV(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const text = e.target.result;
+      const lines = text.split('\n').map(l=>l.trim()).filter(Boolean);
+      const data = getData();
+      let section = null;
+
+      for (const line of lines) {
+        if (line === 'HABITS') { section='habits'; continue; }
+        if (line === 'LOGS') { section='logs'; continue; }
+        if (line.startsWith('id,') || line.startsWith('habitId,')) continue; // header rows
+
+        const cols = parseCSVLine(line);
+        if (section === 'habits' && cols.length >= 9) {
+          const [id,name,emoji,type,unit,target,notifEnabled,notifTime,createdAt] = cols;
+          if (!data.habits.find(h=>h.id===id)) {
+            data.habits.push({id,name,emoji,type,unit,target:parseInt(target)||1,notifEnabled:notifEnabled==='true',notifTime,createdAt,color:'#7c6aff'});
+          }
+        }
+        if (section === 'logs' && cols.length >= 4) {
+          const [habitId,,date,val] = cols;
+          if (!data.logs[habitId]) data.logs[habitId] = {};
+          // only import if not already set
+          if (data.logs[habitId][date] === undefined) {
+            data.logs[habitId][date] = val === 'true' ? true : val === 'false' ? false : parseFloat(val)||0;
+          }
+        }
+      }
+
+      saveData(data);
+      renderToday(); renderManage();
+      showToast('Import complete ✓');
+    } catch(err) {
+      showToast('Import failed — check file format');
+    }
+  };
+  reader.readAsText(file);
+  event.target.value = ''; // reset so same file can be re-imported
+}
+
+function parseCSVLine(line) {
+  const cols = []; let field = '', inQ = false;
+  for (let i=0; i<line.length; i++) {
+    const c = line[i];
+    if (inQ) {
+      if (c==='"' && line[i+1]==='"') { field+='"'; i++; }
+      else if (c==='"') inQ=false;
+      else field+=c;
+    } else {
+      if (c==='"') inQ=true;
+      else if (c===',') { cols.push(field); field=''; }
+      else field+=c;
+    }
+  }
+  cols.push(field);
+  return cols;
 }
 
 // ── UTILS ──
