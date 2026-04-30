@@ -629,13 +629,15 @@ function renderDayProgress(done, total) {
   if (!total) { wrap.innerHTML=''; return; }
   const pct = Math.round(done/total*100);
   const r=28, circ=2*Math.PI*r;
-  const dash = circ*(pct/100);
+  const dash = pct >= 100 ? circ : circ*(pct/100);
+  const gap = pct >= 100 ? 0 : circ - dash;
   wrap.innerHTML = `
     <div class="day-progress" style="margin-bottom:14px;">
       <svg width="68" height="68" viewBox="0 0 68 68">
         <circle cx="34" cy="34" r="${r}" fill="none" stroke="var(--surface3)" stroke-width="6"/>
         <circle cx="34" cy="34" r="${r}" fill="none" stroke="var(--accent)" stroke-width="6"
-          stroke-dasharray="${dash} ${circ}" stroke-dashoffset="${circ/4}" stroke-linecap="round"
+          stroke-dasharray="${dash} ${gap}" stroke-dashoffset="${circ/4}" stroke-linecap="round"
+          transform="rotate(-90 34 34)"
           style="transition:stroke-dasharray 0.4s ease"/>
         <text x="34" y="39" text-anchor="middle" fill="var(--text)" font-family="Azeret Mono" font-size="14" font-weight="700">${pct}%</text>
       </svg>
