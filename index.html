@@ -500,11 +500,15 @@ let modalEmoji = '🎯', modalType = 'boolean';
 let viewingDate = today(); // date string being viewed on Today tab
 
 function uid() { return crypto.randomUUID(); }
-function today() { return new Date().toISOString().split('T')[0]; }
+function today() {
+  const d = new Date();
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+}
 function fromDateStr(s) { const [y,m,d]=s.split('-').map(Number); return new Date(y,m-1,d); }
+function toDateStr(d) { return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
 function shiftDateStr(s, days) {
   const d = fromDateStr(s); d.setDate(d.getDate()+days);
-  return d.toISOString().split('T')[0];
+  return toDateStr(d);
 }
 
 // ── STORAGE ──
@@ -907,7 +911,7 @@ function renderProgContent(habitId) {
   const last30 = [];
   for (let i=29; i>=0; i--) {
     const d = new Date(); d.setDate(d.getDate()-i); d.setHours(0,0,0,0);
-    const ds = d.toISOString().split('T')[0];
+    const ds = toDateStr(d);
     const val = logs[ds];
     last30.push({
       date: ds,
